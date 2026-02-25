@@ -5,7 +5,7 @@ worktree() {
   if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
     cat <<EOF
 Usage: worktree <name> [--base <branch>]
-       worktree cleanup [--remove-branch]
+       worktree cleanup [<name>] [--remove-branch]
 
 A tiny wrapper around git worktree that creates worktrees as sibling
 directories and cds into them.
@@ -26,7 +26,7 @@ EOF
     cmd="worktree-add"
   fi
 
-  output=$(git "$cmd" "$@") || { echo "$output" >&2; return $?; }
+  output=$(git "$cmd" "$@") || { local rc=$?; echo "$output" >&2; return $rc; }
   echo "$output"
   local last_line="${output##*$'\n'}"
   if [[ -d "$last_line" ]]; then

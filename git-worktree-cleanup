@@ -3,10 +3,11 @@ set -euo pipefail
 
 usage() {
   cat <<EOF
-Usage: worktree cleanup [--remove-branch]
+Usage: worktree cleanup [<name>] [--remove-branch]
 
-Remove the current worktree.
-Must be run from inside a worktree (not the main repo).
+Remove a worktree. If <name> is given, removes the worktree with that name
+from anywhere. Otherwise, removes the current worktree (must be run from
+inside a worktree).
 
 Options:
   --remove-branch   Also delete the branch
@@ -15,11 +16,13 @@ EOF
 }
 
 remove_branch=false
+target_name=""
 for arg in "$@"; do
   case "$arg" in
     -h|--help|help) usage ;;
     --remove-branch) remove_branch=true ;;
-    *) echo "error: unknown option '$arg'" >&2; usage ;;
+    -*) echo "error: unknown option '$arg'" >&2; usage ;;
+    *) target_name="$arg" ;;
   esac
 done
 
@@ -28,19 +31,42 @@ git_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
   exit 1
 }
 
-# Check we're actually in a worktree, not the main repo
 git_common=$(git rev-parse --git-common-dir 2>/dev/null)
 git_dir=$(git rev-parse --git-dir 2>/dev/null)
 
-if [[ "$git_common" == "$git_dir" ]]; then
-  echo "error: not inside a worktree (this is the main repo)" >&2
-  exit 1
+if [[ -n "$target_name" ]]; then
+  # Cleanup by name: resolve the worktree path as a sibling directory
+  if [[ "$git_common" == "$git_dir" ]]; then
+    # We're in the main repo
+    main_repo="$git_root"
+  else
+    main_repo=$(cd "$git_common" && git rev-parse --show-toplevel 2>/dev/null || dirname "$git_common")
+  fi
+  repo=$(basename "$main_repo")
+  parent=$(dirname "$main_repo")
+  worktree_path="$parent/$repo-$target_name"
+
+  if [[ ! -d "$worktree_path" ]]; then
+    echo "error: worktree '$worktree_path' does not exist" >&2
+    exit 1
+  fi
+
+  branch="$target_name"
+  removed_path="$worktree_path"
+  git worktree remove "$worktree_path"
+else
+  # Cleanup current worktree: must be inside one
+  if [[ "$git_common" == "$git_dir" ]]; then
+    echo "error: not inside a worktree (this is the main repo). Pass a name: worktree cleanup <name>" >&2
+    exit 1
+  fi
+
+  branch=$(git rev-parse --abbrev-ref HEAD)
+  main_repo=$(cd "$git_common" && git rev-parse --show-toplevel 2>/dev/null || dirname "$git_common")
+  removed_path="$git_root"
+
+  git worktree remove "$git_root"
 fi
-
-branch=$(git rev-parse --abbrev-ref HEAD)
-main_repo=$(cd "$git_common" && git rev-parse --show-toplevel 2>/dev/null || dirname "$git_common")
-
-git worktree remove "$git_root"
 
 if [[ "$remove_branch" == true ]]; then
   if git -C "$main_repo" branch -d "$branch" 2>/dev/null; then
@@ -50,6 +76,6 @@ if [[ "$remove_branch" == true ]]; then
   fi
 fi
 
-echo "Cleaned up worktree at $git_root"
+echo "Cleaned up worktree at $removed_path"
 # Last line is the main repo path — the shell function uses this to cd
 echo "$main_repo"

@@ -23,7 +23,7 @@ repo=$(basename "$git_root")
 parent=$(dirname "$git_root")
 
 name="$1"
-base=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null)
+base=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null) || true
 base="${base#refs/remotes/origin/}"
 base="${base:-main}"
 shift
