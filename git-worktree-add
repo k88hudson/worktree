@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<EOF
+Usage: worktree <name> [--base <branch>]
+
+Create a git worktree + branch as a sibling directory.
+EOF
+  exit 1
+}
+
+[[ $# -lt 1 ]] && usage
+
+case "$1" in -h|--help|help) usage ;; esac
+
+git_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "error: not a git repository" >&2
+  exit 1
+}
+
+repo=$(basename "$git_root")
+parent=$(dirname "$git_root")
+
+name="$1"
+base=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null)
+base="${base#refs/remotes/origin/}"
+base="${base:-main}"
+shift
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --base)
+      [[ $# -lt 2 ]] && { echo "error: --base requires a branch name" >&2; exit 1; }
+      base="$2"
+      shift 2
+      ;;
+    *)
+      echo "error: unknown option '$1'" >&2
+      usage
+      ;;
+  esac
+done
+
+worktree_path="$parent/$repo-$name"
+
+if git show-ref --verify --quiet "refs/heads/$name"; then
+  echo "Branch '$name' already exists, reusing it"
+  git worktree add "$worktree_path" "$name"
+else
+  git worktree add -b "$name" "$worktree_path" "$base"
+fi
+
+# Last line is the path — the shell function uses this to cd
+echo "$worktree_path"

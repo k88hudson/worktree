@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<EOF
+Usage: worktree cleanup [--remove-branch]
+
+Remove the current worktree.
+Must be run from inside a worktree (not the main repo).
+
+Options:
+  --remove-branch   Also delete the branch
+EOF
+  exit 1
+}
+
+remove_branch=false
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help|help) usage ;;
+    --remove-branch) remove_branch=true ;;
+    *) echo "error: unknown option '$arg'" >&2; usage ;;
+  esac
+done
+
+git_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "error: not a git repository" >&2
+  exit 1
+}
+
+# Check we're actually in a worktree, not the main repo
+git_common=$(git rev-parse --git-common-dir 2>/dev/null)
+git_dir=$(git rev-parse --git-dir 2>/dev/null)
+
+if [[ "$git_common" == "$git_dir" ]]; then
+  echo "error: not inside a worktree (this is the main repo)" >&2
+  exit 1
+fi
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+main_repo=$(cd "$git_common" && git rev-parse --show-toplevel 2>/dev/null || dirname "$git_common")
+
+git worktree remove "$git_root"
+
+if [[ "$remove_branch" == true ]]; then
+  if git -C "$main_repo" branch -d "$branch" 2>/dev/null; then
+    echo "Deleted branch '$branch'"
+  else
+    echo "Branch '$branch' not deleted (may have unmerged changes)"
+  fi
+fi
+
+echo "Cleaned up worktree at $git_root"
+# Last line is the main repo path — the shell function uses this to cd
+echo "$main_repo"
