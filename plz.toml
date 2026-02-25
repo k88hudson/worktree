@@ -1,2 +1,6 @@
 [tasks.install]
 run = "rsync -av --exclude '.git' --exclude '.git*' . ~/.worktree/ && echo 'Installed to ~/.worktree'"
+
+[tasks.test]
+run = "node --test test.mjs"
+git_hook = "pre-commit"

@@ -12,11 +12,14 @@ const PATH = `${SCRIPT_DIR}:${process.env.PATH}`;
 let tmp, repo;
 
 function git(args, { cwd = repo, env: extraEnv } = {}) {
-  return execFileSync("git", args, {
-    cwd,
-    env: { ...process.env, PATH, ...extraEnv },
-    encoding: "utf-8",
-  }).trim();
+  const env = { ...process.env, PATH, ...extraEnv };
+  // Unset git env vars that leak from hooks and interfere with test repos
+  delete env.GIT_DIR;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_OBJECT_DIRECTORY;
+  delete env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+  return execFileSync("git", args, { cwd, env, encoding: "utf-8" }).trim();
 }
 
 function gitMayFail(args, opts) {
