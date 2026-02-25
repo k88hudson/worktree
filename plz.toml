@@ -1,0 +1,2 @@
+[tasks.install]
+run = "rsync -av --exclude '.git' --exclude '.git*' . ~/.worktree/ && echo 'Installed to ~/.worktree'"
